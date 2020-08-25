@@ -51,7 +51,7 @@ public class VideoPreviewActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_preview);
-
+        save();
         final VideoResult result = videoResult;
         if (result == null) {
             finish();
@@ -152,8 +152,6 @@ public class VideoPreviewActivity extends AppCompatActivity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
-
             try {
                 copyFile(videoResult.getFile(), videoFile);
                 Toast.makeText(getApplicationContext(), "VIDEO SAVED", Toast.LENGTH_SHORT).show();
@@ -165,7 +163,7 @@ public class VideoPreviewActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void save(Uri uriVideo) {
+    private void save() {
         String folder_main = "Spoken_like_a_pro";
 
         File f = new File(Environment.getExternalStorageDirectory(), folder_main);
