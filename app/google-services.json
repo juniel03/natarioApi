@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "981467521322",
+    "firebase_url": "https://spokentest-fb76e.firebaseio.com",
+    "project_id": "spokentest-fb76e",
+    "storage_bucket": "spokentest-fb76e.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:981467521322:android:a862c5e30312826e3c7e53",
+        "android_client_info": {
+          "package_name": "com.example.natarioapi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "981467521322-tvno3n81nho7rb32f7bdddgttjrsptlf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDobzkSgfrymQ290fShYBg7Iv3omW92tsA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "981467521322-tvno3n81nho7rb32f7bdddgttjrsptlf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

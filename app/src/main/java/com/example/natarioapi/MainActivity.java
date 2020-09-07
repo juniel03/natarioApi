@@ -3,6 +3,8 @@ package com.example.natarioapi;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -15,9 +17,14 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.otaliastudios.cameraview.CameraListener;
 import com.otaliastudios.cameraview.CameraLogger;
 import com.otaliastudios.cameraview.CameraOptions;
@@ -39,11 +46,14 @@ public class MainActivity extends AppCompatActivity {
     private final static boolean USE_FRAME_PROCESSOR = true;
     private final static boolean DECODE_BITMAP = false;
     private boolean recording = false;
-
+    private FirebaseAuth fAuth;
+    FirebaseUser user;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        fAuth = FirebaseAuth.getInstance();
+        user = fAuth.getCurrentUser();
 
         btnRec = (ImageButton) findViewById(R.id.ibRec);
 
@@ -131,6 +141,52 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void logout(View view) {
+        FirebaseAuth.getInstance().signOut();
+        startActivity(new Intent(getApplicationContext(),Login.class));
+        finish();
+    }
+
+    public void changepassword(View view) {
+        final EditText resetpassword  = new EditText(view.getContext());
+        final AlertDialog.Builder resetpasswordDialog = new AlertDialog.Builder(view.getContext());
+        resetpasswordDialog.setTitle("Change Password");
+        resetpasswordDialog.setMessage("Enter New password not less than 6 characters");
+        resetpasswordDialog.setView(resetpassword);
+
+        resetpasswordDialog.setPositiveButton("YES", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                String newpassword  = resetpassword.getText().toString();
+                user.updatePassword(newpassword).addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Toast.makeText(getApplicationContext(), "CHANGED SUCCESSFULLY", Toast.LENGTH_SHORT).show();
+                        FirebaseAuth.getInstance().signOut();
+                        startActivity(new Intent(getApplicationContext(),Login.class));
+                        finish();
+                    }
+                }).addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Toast.makeText(getApplicationContext(), "CHANGED FAILED " + e, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+        resetpasswordDialog.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                //close
+            }
+        });
+        resetpasswordDialog.create().show();
+    }
+
+    public void view(View view) {
+        Intent intent = new Intent(MainActivity.this, Gallery.class);
+        startActivity(intent);
+    }
 
 
     private class Listener extends CameraListener {

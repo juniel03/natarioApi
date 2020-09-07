@@ -1,8 +1,10 @@
 package com.example.natarioapi;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayer;
@@ -14,15 +16,49 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.MimeTypeMap;
 import android.widget.MediaController;
 import android.widget.Toast;
 import android.widget.VideoView;
 
+import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.ExoPlayerFactory;
+import com.google.android.exoplayer2.LoadControl;
+import com.google.android.exoplayer2.PlaybackParameters;
+import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
+import com.google.android.exoplayer2.extractor.ExtractorsFactory;
+import com.google.android.exoplayer2.source.ExtractorMediaSource;
+import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.TrackGroupArray;
+import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
+import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
+import com.google.android.exoplayer2.trackselection.TrackSelector;
+import com.google.android.exoplayer2.ui.PlayerView;
+import com.google.android.exoplayer2.upstream.BandwidthMeter;
+import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
+import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import com.otaliastudios.cameraview.CameraUtils;
 import com.otaliastudios.cameraview.FileCallback;
 import com.otaliastudios.cameraview.VideoResult;
@@ -32,6 +68,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.channels.FileChannel;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -39,10 +76,16 @@ import java.util.Random;
 
 public class VideoPreviewActivity extends AppCompatActivity {
 
-    private VideoView videoView;
-
+    private Uri videouri;
+    UploadTask uploadTask;
+    Member member;
     private static VideoResult videoResult;
 
+    StorageReference storageReference;
+    DatabaseReference databaseReference;
+
+    PlayerView playerView;
+    SimpleExoPlayer simpleExoPlayer;
     public static void setVideoResult(@Nullable VideoResult result) {
         videoResult = result;
     }
@@ -51,68 +94,94 @@ public class VideoPreviewActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_preview);
-        save();
+        playerView = findViewById(R.id.video_view);
+
         final VideoResult result = videoResult;
         if (result == null) {
             finish();
             return;
         }
+        videouri = Uri.fromFile(result.getFile());
+        LoadControl loadControl = new DefaultLoadControl();
+        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+        TrackSelector trackSelector = new DefaultTrackSelector(new AdaptiveTrackSelection.Factory(bandwidthMeter));
 
-        videoView = findViewById(R.id.video);
-        videoView.setOnClickListener(new View.OnClickListener() {
+        simpleExoPlayer = ExoPlayerFactory.newSimpleInstance(VideoPreviewActivity.this, trackSelector, loadControl);
+        MediaSource audioSource = new ExtractorMediaSource(
+                videouri,
+                new DefaultDataSourceFactory(this, "MyExoplayer"),
+                new DefaultExtractorsFactory(),
+                null,
+                null
+        );
+
+        simpleExoPlayer.prepare(audioSource);
+        playerView.setPlayer(simpleExoPlayer);
+        playerView.setKeepScreenOn(true);
+        simpleExoPlayer.setPlayWhenReady(false);
+        simpleExoPlayer.addListener(new Player.EventListener() {
             @Override
-            public void onClick(View view) {
-                playVideo();
+            public void onTimelineChanged(Timeline timeline, @Nullable Object manifest, int reason) {
+
             }
-        });
-        final MessageView actualResolution = findViewById(R.id.actualResolution);
-        final MessageView isSnapshot = findViewById(R.id.isSnapshot);
-        final MessageView rotation = findViewById(R.id.rotation);
-        final MessageView audio = findViewById(R.id.audio);
-        final MessageView audioBitRate = findViewById(R.id.audioBitRate);
-        final MessageView videoCodec = findViewById(R.id.videoCodec);
-        final MessageView audioCodec = findViewById(R.id.audioCodec);
-        final MessageView videoBitRate = findViewById(R.id.videoBitRate);
-        final MessageView videoFrameRate = findViewById(R.id.videoFrameRate);
 
-        AspectRatio ratio = AspectRatio.of(result.getSize());
-        actualResolution.setTitleAndMessage("Size", result.getSize() + " (" + ratio + ")");
-        isSnapshot.setTitleAndMessage("Snapshot", result.isSnapshot() + "");
-        rotation.setTitleAndMessage("Rotation", result.getRotation() + "");
-        audio.setTitleAndMessage("Audio", result.getAudio().name());
-        audioBitRate.setTitleAndMessage("Audio bit rate", result.getAudioBitRate() + " bits per sec.");
-        videoCodec.setTitleAndMessage("VideoCodec", result.getVideoCodec().name());
-        audioCodec.setTitleAndMessage("AudioCodec", result.getAudioCodec().name());
-        videoBitRate.setTitleAndMessage("Video bit rate", result.getVideoBitRate() + " bits per sec.");
-        videoFrameRate.setTitleAndMessage("Video frame rate", result.getVideoFrameRate() + " fps");
-        MediaController controller = new MediaController(this);
-        controller.setAnchorView(videoView);
-        controller.setMediaPlayer(videoView);
-        videoView.setMediaController(controller);
-        videoView.setVideoURI(Uri.fromFile(result.getFile()));
-        videoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
             @Override
-            public void onPrepared(MediaPlayer mp) {
-                ViewGroup.LayoutParams lp = videoView.getLayoutParams();
-                float videoWidth = mp.getVideoWidth();
-                float videoHeight = mp.getVideoHeight();
-                float viewWidth = videoView.getWidth();
-                lp.height = (int) (viewWidth * (videoHeight / videoWidth));
-                videoView.setLayoutParams(lp);
-                playVideo();
+            public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
 
-                if (result.isSnapshot()) {
-                    // Log the real size for debugging reason.
-                    Log.e("VideoPreview", "The video full size is " + videoWidth + "x" + videoHeight);
-                }
+            }
+
+            @Override
+            public void onLoadingChanged(boolean isLoading) {
+
+            }
+
+            @Override
+            public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+
+            }
+
+            @Override
+            public void onPlaybackSuppressionReasonChanged(int playbackSuppressionReason) {
+
+            }
+
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+
+            }
+
+            @Override
+            public void onRepeatModeChanged(int repeatMode) {
+
+            }
+
+            @Override
+            public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
+
+            }
+
+            @Override
+            public void onPlayerError(ExoPlaybackException error) {
+
+            }
+
+            @Override
+            public void onPositionDiscontinuity(int reason) {
+
+            }
+
+            @Override
+            public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
+
+            }
+
+            @Override
+            public void onSeekProcessed() {
+
             }
         });
     }
-    void playVideo() {
-        if (!videoView.isPlaying()) {
-            videoView.start();
-        }
-    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -120,6 +189,21 @@ public class VideoPreviewActivity extends AppCompatActivity {
             setVideoResult(null);
         }
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        simpleExoPlayer.setPlayWhenReady(false);
+        simpleExoPlayer.getPlaybackState();
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        simpleExoPlayer.setPlayWhenReady(true);
+        simpleExoPlayer.getPlaybackState();
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.share, menu);
@@ -160,6 +244,52 @@ public class VideoPreviewActivity extends AppCompatActivity {
             }
             return true;
         }
+        if (item.getItemId() == R.id.upload){
+            storageReference = FirebaseStorage.getInstance().getReference("Video");
+            databaseReference = FirebaseDatabase.getInstance().getReference("Video");
+
+            final StorageReference reference = storageReference.child(System.currentTimeMillis() + ".mp4");
+            uploadTask = reference.putFile(videouri);
+
+            Task<Uri> uriTask = uploadTask.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
+                @Override
+                public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
+                    if (!task.isSuccessful()){
+                        throw task.getException();
+                    }
+                    return reference.getDownloadUrl();
+                }
+            }).addOnCompleteListener(new OnCompleteListener<Uri>() {
+                @Override
+                public void onComplete(@NonNull Task<Uri> task) {
+                    if (task.isSuccessful()) {
+                        Uri downloadUrl = task.getResult();
+                        Toast.makeText(VideoPreviewActivity.this, "data saved", Toast.LENGTH_SHORT).show();
+                        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                        String userId = user.getUid();
+                        member.setUname(userId);
+                        member.setVideoUrl(downloadUrl.toString());
+                        String i = databaseReference.push().getKey();
+                        databaseReference.child(i).setValue(member);
+                    }
+                }
+            }).addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    Toast.makeText(VideoPreviewActivity.this, "Failed" + e, Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            return true;
+        }
+        if (item.getItemId() == R.id.view){
+            Intent intent = new Intent(VideoPreviewActivity.this, FullScreen.class);
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            String userId = user.getUid();
+            intent.putExtra("name",userId);
+            startActivity(intent);
+            return true;
+        }
         return super.onOptionsItemSelected(item);
     }
 
@@ -188,6 +318,10 @@ public class VideoPreviewActivity extends AppCompatActivity {
                 outChannel.close();
         }
     }
-
+    private String getExtension(Uri uri){
+        ContentResolver contentResolver = getContentResolver();
+        MimeTypeMap mimeTypeMap = MimeTypeMap.getSingleton();
+        return  mimeTypeMap.getExtensionFromMimeType(contentResolver.getType(uri));
+    }
 
 }

@@ -8,5 +8,11 @@
     <item android:id="@+id/save"
         android:title="Save"
         app:showAsAction="always"
-        android:icon="@drawable/ic_save"/>
+        android:icon="@drawable/ic_baseline_save"/>
+    <item android:id="@+id/upload"
+        android:title="Upload"
+        android:icon="@drawable/ic_baseline_cloud_upload"/>
+    <item android:id="@+id/view"
+        android:title="View Upload"
+        android:icon="@drawable/ic_baseline_cloud_upload"/>
 </menu>
