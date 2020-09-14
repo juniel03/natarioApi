@@ -78,7 +78,6 @@ public class Register extends AppCompatActivity {
                             public void onComplete(@NonNull Task<AuthResult> task) {
                                 if (task.isSuccessful()){
                                     Toast.makeText(getApplicationContext(), "LOGGING IN", Toast.LENGTH_SHORT).show();
-
                                     member.setUname(username);
                                     FirebaseUser user = fAuth.getCurrentUser();
                                     databaseReference.child(user.getUid()).setValue(member);
